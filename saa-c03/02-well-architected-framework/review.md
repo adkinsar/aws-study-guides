@@ -16,7 +16,7 @@ Security is emphasized in the design of solution architectures to ensure a workl
 
 - Implement a strong, centralized **identity foundation** using the principle of least privilege. Eliminate the usage of long-term static credentials.
 - Monitoring, alerting, and auditing of environment changes, logs, and metrics create **traceability**
-- Apply security at all layers (defense in depth)
+- Apply security at all layers (defense in depth: physical, technical, and administrative controls. Every component in a application stack has relevant security controls in place to limit access)
 - Automate security best practices
 - Protect data in transit and at rest
 - Keep people away from data with proper access controls
@@ -35,6 +35,10 @@ A workload should be available and capable of performing its business requiremen
 - Scale horizontally to reduce single points of failure in an architecture
 - Auto-scale capacity, don't guess what it should be
 - Manage change via version-controlled change management practices.
+
+**recovery point objective (RPO)** A metric that specifies the acceptable amount of data that can be lost within a specified period.
+
+**recovery time objective (RTO)** A metric that specifies the maximum length of time that a service can be down after a failure has occurred.
 
 ### Performance Efficiency Pillar
 
@@ -78,3 +82,25 @@ Reduce energy consumption and maximize efficieny of utilized resources.
 - Adopt the most efficient hardware and software offerings
 - Use managed services where possible
 - Reduce impact on client devices
+
+
+### CloudWatch Monitoring
+
+[FAQs](https://aws.amazon.com/cloudwatch/faqs/)
+
+An underlying theme in all of the well-architected pillars is the need for observability and monitoring of your environment. CloudWatch enables the ability to monitor each cloud service for calculating the reliability of a workload use cloud service metrics. *Service-level* indicators include the following:
+
+- Availability: The amount of time a service is available and usable
+- Latency: How quickly requests are fulfilled
+- Throughput: How much data is processed measured in input/output operations per second (IOPS)
+- Durability: The likelihood that data written to storage is retrievable in the future.
+
+### CloudFront as a CDN
+
+[FAQs](https://aws.amazon.com/cloudfront/faqs/?nc=sn&loc=5&dn=2)
+
+In relation to performance efficiency consider CloudFront as a global cache for hundreds of point of presence (POPs) locations globally to place assets as close as possible to users.
+
+### One Codebase to Many Deployments
+
+The same codebase should get deployed for each workload account. Infrastructure is included in this regard as well, components worth considering include but are not limited to AMIs, EBS volumes, EBS snapshots, Container images, serverless applications
