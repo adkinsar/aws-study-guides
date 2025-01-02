@@ -35,7 +35,7 @@ export class VpnVpcStack extends cdk.Stack {
 
     this.vpc = new ec2.Vpc(this, "dev-vpc", vpcProps);
     this.sg = this.createSecurityGroup(this.vpc);
-    const kp = this.createSshKeyPair();
+    const kp = this.getSshKeyPair();
 
     const instance = this.createEc2Instance(this.vpc, this.sg, kp);
   }
@@ -50,7 +50,7 @@ export class VpnVpcStack extends cdk.Stack {
     ];
   }
 
-  createSshKeyPair(): ec2.KeyPair {
+  getSshKeyPair(): ec2.KeyPair {
     const kp = ec2.KeyPair.fromKeyPairName(
       this,
       "public-ssh",
