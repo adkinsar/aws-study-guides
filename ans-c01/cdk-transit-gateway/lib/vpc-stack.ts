@@ -2,17 +2,20 @@ import * as cdk from "aws-cdk-lib";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import { Construct } from "constructs";
 
-const AZS: string[] = ["us-east-2a", "us-east-2b"];
-const VPC_CIDR: string = "10.0.0.0/24";
+interface VpcStackProps extends cdk.StackProps {
+  transitGatewayId: string;
+  vpcCidr: string;
+  peerVpcCidr: string;
+}
+const AZS: string[] = ["us-east-2a"];
 const SUBNET_MASK: number = 28;
 
-export class CdkTransitGatewayStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+export class VpcStack extends cdk.Stack {
+  constructor(scope: Construct, id: string, props: VpcStackProps) {
     super(scope, id, props);
 
-    // create a vpc with two isolated subnets remove the default security group rules
-    const vpc = new ec2.Vpc(this, "tgw-vpc", {
-      ipAddresses: ec2.IpAddresses.cidr(VPC_CIDR),
+    const vpc = new ec2.Vpc(this, "vpc", {
+      ipAddresses: ec2.IpAddresses.cidr(props.vpcCidr),
       availabilityZones: AZS,
       createInternetGateway: false,
       natGateways: 0,
@@ -24,29 +27,13 @@ export class CdkTransitGatewayStack extends cdk.Stack {
         },
       ],
     });
-    // create a transit gateway that will connect to the vpc
-    const transitGateway = new ec2.CfnTransitGateway(this, "lab-tgw");
 
-    // create an attachment for the vpc
-    const vpcAttachment = new ec2.CfnTransitGatewayAttachment(
-      this,
-      "tgw-vpc-attachment",
-      {
-        transitGatewayId: transitGateway.ref,
-        vpcId: vpc.vpcId,
-        subnetIds: vpc.selectSubnets({
-          subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
-        }).subnetIds,
-      }
-    );
-
-    // create a security group that has an ingress rule for https traffic on port 443 originating from 10.0.0.0/24
-    const sg = new ec2.SecurityGroup(this, "security-group", {
+    const interfaceSg = new ec2.SecurityGroup(this, "security-group", {
       vpc: vpc,
       securityGroupName: "vpc-endpoint-for-ssm-sg",
     });
 
-    sg.addIngressRule(
+    interfaceSg.addIngressRule(
       ec2.Peer.ipv4(vpc.vpcCidrBlock),
       ec2.Port.tcp(443),
       "Allow HTTPS traffic from VPC"
@@ -62,25 +49,65 @@ export class CdkTransitGatewayStack extends cdk.Stack {
     vpc.addInterfaceEndpoint("ssm-interface-endpoint", {
       service: ec2.InterfaceVpcEndpointAwsService.SSM,
       subnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
-      securityGroups: [sg],
+      securityGroups: [interfaceSg],
     });
     vpc.addInterfaceEndpoint("ssm-messages-interface-endpoint", {
       service: ec2.InterfaceVpcEndpointAwsService.SSM_MESSAGES,
       subnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
-      securityGroups: [sg],
+      securityGroups: [interfaceSg],
     });
     vpc.addInterfaceEndpoint("ec2-interface-endpoint", {
       service: ec2.InterfaceVpcEndpointAwsService.EC2_MESSAGES,
       subnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
-      securityGroups: [sg],
+      securityGroups: [interfaceSg],
     });
     vpc.addInterfaceEndpoint("ec2-messages-interface-endpoint", {
       service: ec2.InterfaceVpcEndpointAwsService.EC2,
       subnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
-      securityGroups: [sg],
+      securityGroups: [interfaceSg],
     });
-    const server = new ec2.Instance(this, "dev-instance", {
-      vpc: vpc,
+
+    // Create TGW attachment
+    const tgwAttachment = new ec2.CfnTransitGatewayAttachment(
+      this,
+      "tgw-vpc-attachment",
+      {
+        transitGatewayId: props.transitGatewayId,
+        vpcId: vpc.vpcId,
+        subnetIds: vpc.selectSubnets({
+          subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+        }).subnetIds,
+      }
+    );
+
+    // Add route to peer VPC via Transit Gateway
+    vpc.isolatedSubnets.forEach((subnet, i) => {
+      new ec2.CfnRoute(this, `tgw-route-${i}`, {
+        routeTableId: subnet.routeTable.routeTableId,
+        destinationCidrBlock: props.peerVpcCidr,
+        transitGatewayId: props.transitGatewayId,
+      }).addDependency(tgwAttachment);
+    });
+
+    // Security group for instances
+    const sg = new ec2.SecurityGroup(this, "instance-sg", {
+      vpc,
+      allowAllOutbound: true,
+    });
+
+    // Allow inbound from peer VPC
+    sg.addIngressRule(
+      ec2.Peer.ipv4(props.peerVpcCidr),
+      ec2.Port.allIcmp(),
+      "Allow all ICMP from peer VPC"
+    );
+
+    // Create EC2 instance
+    const instance = new ec2.Instance(this, "instance", {
+      vpc,
+      vpcSubnets: {
+        subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+      },
       instanceType: ec2.InstanceType.of(
         ec2.InstanceClass.T2,
         ec2.InstanceSize.MICRO
@@ -88,12 +115,8 @@ export class CdkTransitGatewayStack extends cdk.Stack {
       machineImage: new ec2.AmazonLinuxImage({
         generation: ec2.AmazonLinuxGeneration.AMAZON_LINUX_2,
       }),
-      vpcSubnets: {
-        subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
-      },
-      associatePublicIpAddress: false,
-      userDataCausesReplacement: false,
-      role: new cdk.aws_iam.Role(this, "ssm-instance-role", {
+      securityGroup: sg,
+      role: new cdk.aws_iam.Role(this, "ssm-role", {
         assumedBy: new cdk.aws_iam.ServicePrincipal("ec2.amazonaws.com"),
         managedPolicies: [
           cdk.aws_iam.ManagedPolicy.fromAwsManagedPolicyName(
