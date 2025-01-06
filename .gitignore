@@ -7,3 +7,9 @@
 # CDK asset staging directory
 **/.cdk.staging
 **/cdk.out
+
+# Jest config
+**/jest.config.js
+
+# Nested README
+**/README.md
