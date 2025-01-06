@@ -26,3 +26,29 @@ The VPN concentrator on the Amazon side of the site-to-site VPN connection.
 
 - IPv6 traffic is not supported for VPN connections with a Virtual Private Gateway.
 - Path MTU Discover is not supported with an AWS VPN connection
+
+## Network Implementation
+
+### AWS Global Accelerator
+
+Reduce latency for users by routing traffic to the nearest application endpoint that is in closest proximity to users.
+
+### Transit Gateway attachment types
+
+#### Peering
+
+#### VPC
+
+#### VPN
+
+#### Transit Gateway Connect
+
+An attachment type that uses Generic Routing Encapsulation (GRE) for higher bandwith performance compared to a VPN connection. GRE tunnels can also be used for establishing a connection to a third-party SD-WAN virtual appliance.
+
+### Transit Gateway Network Manager
+
+Provides a global view of your private network, allowing you to manage you AWS and on-premises resources and itegrate with your SD-WAN
+
+### AWS Load Balancer Controller
+
+An optional add-on in EKS that manages elastic load balancers for a Kubernetes cluster. Kubernetes ingress utilizes Application Load Balancers. A Kubernetes load-balancer service will produce a Network Load Balancer.
