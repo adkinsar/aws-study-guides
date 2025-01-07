@@ -128,6 +128,12 @@ export class VpcStack extends cdk.Stack {
       }),
     });
 
+    new cdk.CfnOutput(this, "InstanceId", {
+      value: instance.instanceId,
+      description: "The ID of the EC2 instance",
+      exportName: "InstanceNodeId",
+    });
+
     const inferenceProfile = new bedrock.CfnApplicationInferenceProfile(
       this,
       "inference-profile",
@@ -144,6 +150,7 @@ export class VpcStack extends cdk.Stack {
       actions: ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
       resources: [
         `arn:aws:bedrock:${this.region}::foundation-model/meta.llama3-3-70b-instruct-v1:0`,
+        inferenceProfile.attrInferenceProfileArn,
       ],
       principals: [new iam.ArnPrincipal(instance.role.roleArn)],
       effect: cdk.aws_iam.Effect.ALLOW,
@@ -162,3 +169,10 @@ export class VpcStack extends cdk.Stack {
     bedRockEndpoint.addToPolicy(invokeBedrockPolicy);
   }
 }
+
+// aws bedrock-runtime invoke-model \
+// --model-id meta.llama3-3-70b-instruct-v1:0 \
+// --body '{"prompt": "Describe the purpose of a \"hello world\" program in one line.",
+// "max_gen_len": 512, "temperature": 0.1, "top_p": 0.9}' \
+// --cli-binary-format raw-in-base64-out \
+// invoke-model-output-text.txt
