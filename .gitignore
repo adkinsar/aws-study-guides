@@ -13,3 +13,6 @@
 
 # Nested README
 **/README.md
+
+# workshops to ignore
+dva-c02/cognito-workshop
